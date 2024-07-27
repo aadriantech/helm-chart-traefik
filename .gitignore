@@ -1,0 +1,56 @@
+# Helm package files
+*.tgz
+
+# Ignore Kubernetes configuration files
+kubeconfig
+
+# Ignore dependency directories
+charts/
+
+# Ignore temporary and log files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.orig
+*.rej
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# VSCode
+.vscode/
+.history/
+
+# Unix
+*~
+# Temporary files created by text editors
+.*.swp
+.*.swo
+.*.swn

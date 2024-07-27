@@ -1,0 +1,22 @@
+# Ensure all files use LF line endings
+* text=auto eol=lf
+
+# Treat Helm chart files as text
+*.yaml text
+*.yml text
+*.tpl text
+*.sh text
+
+# Ensure other text files use LF line endings
+*.md text
+*.txt text
+*.json text
+
+# Treat binary files correctly
+*.tgz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
