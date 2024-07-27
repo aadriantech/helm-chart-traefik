@@ -3,7 +3,7 @@
 [Traefik](https://traefik.io/) is a modern HTTP reverse proxy and load balancer made to deploy
 microservices with ease.
 
-## User Custom Notes
+## User Notes
 I have added a loadbalancer-values.yaml file, which contains the loadbalancer values settings from the Traefik chart, configuration equivalent to using --set service.type=LoadBalancer. To apply use the following install command
 ```bash
 helm install traefik . --namespace traefik -f loadbalancer-values.yaml
