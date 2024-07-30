@@ -62,13 +62,14 @@ deployment:
   #   volumeMounts:
   #     - name: dsdsocket
   #       mountPath: /socket
+  
   # -- Additional volumes available for use with initContainers and additionalContainers
   additionalVolumes: []
   # - name: dsdsocket
   #   hostPath:
   #     path: /var/run/statsd-exporter
+
   # -- Additional initContainers (e.g. for setting file permission as shown below)
-  initContainers: []
   # The "volume-permissions" init container is required if you run into permission issues.
   # Related issue: https://github.com/traefik/traefik-helm-chart/issues/396
   # - name: volume-permissions
@@ -78,6 +79,14 @@ deployment:
   #     - name: data
   #       mountPath: /data
   # -- Use process namespace sharing
+  initContainers:
+  - name: volume-permissions
+    image: busybox:latest
+    command: ["sh", "-c", "touch /data/acme.json; chmod -v 600 /data/acme.json"]
+    volumeMounts:
+      - name: data
+        mountPath: /data
+
   shareProcessNamespace: false
   # -- Custom pod DNS policy. Apply if `hostNetwork: true`
   # dnsPolicy: ClusterFirstWithHostNet
@@ -501,6 +510,7 @@ metrics:
         key:
         # -- When set to true, the TLS connection accepts any certificate presented by the server regardless of the hostnames it covers.
         insecureSkipVerify:
+
     grpc:
       # -- Set to true in order to send metrics to the OpenTelemetry Collector using gRPC
       enabled: false
@@ -775,35 +785,31 @@ service:
   # -- Additional entries here will be added to the service spec.
   # -- Cannot contain type, selector or ports entries.
   spec: {}
-  # externalTrafficPolicy: Cluster
-  # loadBalancerIP: "1.2.3.4"
-  # clusterIP: "2.3.4.5"
-  loadBalancerSourceRanges: []
-  # - 192.168.0.1/32
-  # - 172.16.0.0/16
+  externalTrafficPolicy: Cluster
+  # MetalLB IP Address Pool
+  loadBalancerIP: "172.19.0.240"
+  loadBalancerSourceRanges:
+    - 172.19.0.240/29
+  externalIPs: []
   ## -- Class of the load balancer implementation
   # loadBalancerClass: service.k8s.aws/nlb
-  externalIPs: []
-  # - 1.2.3.4
   ## One of SingleStack, PreferDualStack, or RequireDualStack.
-  # ipFamilyPolicy: SingleStack
+  ipFamilyPolicy: SingleStack
   ## List of IP families (e.g. IPv4 and/or IPv6).
   ## ref: https://kubernetes.io/docs/concepts/services-networking/dual-stack/#services
-  # ipFamilies:
-  #   - IPv4
-  #   - IPv6
-  ##
+  ipFamilies:
+    - IPv4
   additionalServices: {}
   ## -- An additional and optional internal Service.
   ## Same parameters as external Service
-  # internal:
-  #   type: ClusterIP
-  #   # labels: {}
-  #   # annotations: {}
-  #   # spec: {}
-  #   # loadBalancerSourceRanges: []
-  #   # externalIPs: []
-  #   # ipFamilies: [ "IPv4","IPv6" ]
+  internal:
+    type: ClusterIP
+    labels: {}
+    annotations: {}
+    spec: {}
+    loadBalancerSourceRanges: []
+    externalIPs: []
+    ipFamilies: [ "IPv4" ]
 
 autoscaling:
   # -- Create HorizontalPodAutoscaler object.
@@ -814,7 +820,7 @@ persistence:
   # -- Enable persistence using Persistent Volume Claims
   # ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
   # It can be used to store TLS certificates, see `storage` in certResolvers
-  enabled: false
+  enabled: true
   name: data
   #  existingClaim: ""
   accessMode: ReadWriteOnce
@@ -829,10 +835,17 @@ persistence:
 # -- Certificates resolvers configuration.
 # Ref: https://doc.traefik.io/traefik/https/acme/#certificate-resolvers
 # See EXAMPLES.md for more details.
-certResolvers: {}
+# @Adrian Notes: Disable Cert Manager since its local setup
+#certResolvers:
+#  letsencrypt:
+#    acme:
+#      email: adrian.adriano.tech@gmail.com
+#      storage: /data/acme.json
+#      httpChallenge:
+#        entryPoint: web
 
 # -- If hostNetwork is true, runs traefik in the host network namespace
-# To prevent unschedulabel pods due to port collisions, if hostNetwork=true
+# To prevent unschedulable pods due to port collisions, if hostNetwork=true
 # and replicas>1, a pod anti-affinity is recommended and will be set if the
 # affinity is left as default.
 hostNetwork: false
@@ -864,35 +877,41 @@ serviceAccount:
 serviceAccountAnnotations: {}
 
 # -- [Resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) for `traefik` container.
-resources: {}
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
 
 # -- This example pod anti-affinity forces the scheduler to put traefik pods
 # -- on nodes where no other traefik pods are scheduled.
 # It should be used when hostNetwork: true to prevent port conflicts
-affinity: {}
-#  podAntiAffinity:
-#    requiredDuringSchedulingIgnoredDuringExecution:
-#      - labelSelector:
-#          matchLabels:
-#            app.kubernetes.io/name: '{{ template "traefik.name" . }}'
-#            app.kubernetes.io/instance: '{{ .Release.Name }}-{{ .Release.Namespace }}'
-#        topologyKey: kubernetes.io/hostname
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: '{{ template "traefik.name" . }}'
+            app.kubernetes.io/instance: '{{ .Release.Name }}'
+        topologyKey: kubernetes.io/hostname
 
 # -- nodeSelector is the simplest recommended form of node selection constraint.
 nodeSelector: {}
+
 # -- Tolerations allow the scheduler to schedule pods with matching taints.
 tolerations: []
+
 # -- You can use topology spread constraints to control
 # how Pods are spread across your cluster among failure-domains.
-topologySpreadConstraints: []
-# This example topologySpreadConstraints forces the scheduler to put traefik pods
-# on nodes where no other traefik pods are scheduled.
-#  - labelSelector:
-#      matchLabels:
-#        app: '{{ template "traefik.name" . }}'
-#    maxSkew: 1
-#    topologyKey: kubernetes.io/hostname
-#    whenUnsatisfiable: DoNotSchedule
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: '{{ template "traefik.name" . }}'
 
 # -- [Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/)
 priorityClassName: ""
@@ -933,7 +952,7 @@ hub:
   token:
   apimanagement:
     # -- Set to true in order to enable API Management. Requires a valid license token.
-    enabled:
+    enabled: false
     admission:
       # -- WebHook admission server listen address. Default: "0.0.0.0:9943".
       listenAddr:
@@ -943,32 +962,33 @@ hub:
   ratelimit:
     redis:
       # -- Enable Redis Cluster. Default: true.
-      cluster:
+      cluster: true
       # -- Database used to store information. Default: "0".
-      database:
+      database: "0"
       # -- Endpoints of the Redis instances to connect to. Default: "".
-      endpoints:
+      endpoints: []
       # -- The username to use when connecting to Redis endpoints. Default: "".
-      username:
+      username: ""
       # -- The password to use when connecting to Redis endpoints. Default: "".
-      password:
+      password: ""
       sentinel:
         # -- Name of the set of main nodes to use for main selection. Required when using Sentinel. Default: "".
-        masterset:
+        masterset: ""
         # -- Username to use for sentinel authentication (can be different from endpoint username). Default: "".
-        username:
+        username: ""
         # -- Password to use for sentinel authentication (can be different from endpoint password). Default: "".
-        password:
+        password: ""
       # -- Timeout applied on connection with redis. Default: "0s".
-      timeout:
+      timeout: "0s"
       tls:
         # -- Path to the certificate authority used for the secured connection.
-        ca:
+        ca: ""
         # -- Path to the public certificate used for the secure connection.
-        cert:
+        cert: ""
         # -- Path to the private key used for the secure connection.
-        key:
+        key: ""
         # -- When insecureSkipVerify is set to true, the TLS connection accepts any certificate presented by the server. Default: false.
-        insecureSkipVerify:
+        insecureSkipVerify: false
   # Enable export of errors logs to the platform. Default: true.
-  sendlogs:
+  sendlogs: true
+
